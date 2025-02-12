@@ -156,3 +156,215 @@ if apk_path:
 - **Interface Web para baixar o APK e executar o comando ADB automaticamente**.  
 
 Agora o usuário remoto pode **instalar APKs no celular conectado ao PC** de forma automática! 🚀
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ótimo! Vamos criar a **API REST** usando o **Django REST Framework (DRF)** para permitir que um usuário remoto baixe e instale o APK.  
+
+---
+
+## **📌 1. Instalando o Django REST Framework**
+Se ainda não tiver o DRF instalado, rode:  
+```sh
+pip install djangorestframework
+```
+
+E adicione `'rest_framework'` no `INSTALLED_APPS` do **settings.py**:  
+```python
+INSTALLED_APPS = [
+    # Outros apps...
+    "rest_framework",
+    "downloads",
+]
+```
+
+Se quiser configurar permissões globais, adicione:  
+```python
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+}
+```
+
+---
+
+## **📌 2. Criando o Serializer**
+Vamos criar um **serializer** para representar os arquivos APKs na API.  
+
+📁 **downloads/serializers.py**  
+```python
+from rest_framework import serializers
+from .models import APKFile
+
+class APKFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = APKFile
+        fields = ["id", "nome", "arquivo"]
+```
+
+---
+
+## **📌 3. Criando a ViewSet para os APKs**
+Agora criamos uma API que permite listar, obter detalhes e baixar os APKs.  
+
+📁 **downloads/views.py**  
+```python
+from rest_framework import viewsets
+from rest_framework.response import Response
+from django.conf import settings
+from .models import APKFile
+from .serializers import APKFileSerializer
+
+class APKFileViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API que permite listar e obter detalhes de arquivos APK disponíveis no servidor.
+    """
+    queryset = APKFile.objects.all()
+    serializer_class = APKFileSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        apk = self.get_object()
+        return Response({
+            "id": apk.id,
+            "nome": apk.nome,
+            "arquivo": request.build_absolute_uri(settings.MEDIA_URL + str(apk.arquivo))
+        })
+```
+
+---
+
+## **📌 4. Criando as Rotas**
+Agora criamos as **rotas da API** no `urls.py` do app **downloads**.  
+
+📁 **downloads/urls.py**  
+```python
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import APKFileViewSet
+
+router = DefaultRouter()
+router.register(r"apk", APKFileViewSet, basename="apkfile")
+
+urlpatterns = [
+    path("", include(router.urls)),
+]
+```
+
+E registramos no **urls.py principal** do projeto Django:  
+📁 **onboard/urls.py**  
+```python
+from django.urls import path, include
+
+urlpatterns = [
+    path("downloads/", include("downloads.urls")),
+]
+```
+
+---
+
+## **📌 5. Testando a API**
+Agora podemos acessar os endpoints:  
+
+### ✅ **Listar todos os APKs**
+```
+GET http://127.0.0.1:8000/downloads/apk/
+```
+**Resposta JSON:**  
+```json
+[
+    {
+        "id": 1,
+        "nome": "MeuApp",
+        "arquivo": "/media/apks/meuapp.apk"
+    }
+]
+```
+
+### ✅ **Obter um APK específico**
+```
+GET http://127.0.0.1:8000/downloads/apk/1/
+```
+**Resposta JSON:**  
+```json
+{
+    "id": 1,
+    "nome": "MeuApp",
+    "arquivo": "http://127.0.0.1:8000/media/apks/meuapp.apk"
+}
+```
+Esse link pode ser usado para **baixar e instalar** remotamente.
+
+---
+
+## **📌 6. Como Instalar o APK no Usuário Remoto?**
+Agora o usuário remoto pode rodar o **script Python** para baixar e instalar o APK via **ADB**.
+
+📁 **downloads/installer_script.py**  
+```python
+import requests
+import subprocess
+
+APK_ID = 1  # ID do APK no banco de dados
+SERVER_URL = "http://127.0.0.1:8000"
+
+def baixar_apk():
+    response = requests.get(f"{SERVER_URL}/downloads/apk/{APK_ID}/")
+    if response.status_code == 200:
+        apk_url = response.json()["arquivo"]
+        apk_path = "downloaded_apk.apk"
+
+        apk_file = requests.get(apk_url)
+        with open(apk_path, "wb") as f:
+            f.write(apk_file.content)
+        
+        print(f"APK baixado com sucesso: {apk_path}")
+        return apk_path
+    else:
+        print("Erro ao obter o link do APK")
+        return None
+
+def instalar_apk(apk_path):
+    check_device = subprocess.run(["adb", "devices"], capture_output=True, text=True)
+    if "device" not in check_device.stdout.split("\n")[1]:
+        print("Nenhum dispositivo Android encontrado. Conecte o celular e tente novamente.")
+        return
+
+    result = subprocess.run(["adb", "install", apk_path], capture_output=True, text=True)
+    if result.returncode == 0:
+        print("APK instalado com sucesso!")
+    else:
+        print(f"Erro ao instalar APK: {result.stderr}")
+
+# Fluxo
+apk_path = baixar_apk()
+if apk_path:
+    instalar_apk(apk_path)
+```
+
+---
+
+## **📌 7. Resumo**
+✅ **Criamos a API REST** com Django REST Framework.  
+✅ **Configuramos as rotas** para listar e obter detalhes de APKs.  
+✅ **Criamos um script remoto** que baixa e instala o APK via ADB.  
+
+Agora qualquer usuário remoto pode **acessar a API**, **baixar um APK** e **instalar no celular conectado ao PC**! 🚀

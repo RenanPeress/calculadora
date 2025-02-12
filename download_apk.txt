@@ -1,0 +1,158 @@
+Para permitir que um usuário acesse sua aplicação de outra máquina e **instale o APK remotamente** no dispositivo Android conectado ao computador dele, precisamos de uma solução que:  
+
+1. **Armazene o APK no servidor Django**.  
+2. **Envie o APK para o computador do usuário remoto**.  
+3. **Execute o comando ADB na máquina do usuário para instalar o APK**.  
+
+---
+
+## **📌 1. Onde Armazenar o APK?**  
+Vamos armazenar os arquivos **no próprio servidor Django** dentro da pasta `media/`.  
+
+📁 **onboard/**  
+├── 📁 `media/apks/` → Aqui ficam os APKs armazenados no servidor.  
+📁 **settings.py** (Configuração para servir arquivos de mídia)  
+```python
+import os
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+```
+E no `urls.py` principal, adicionamos suporte para arquivos de mídia:  
+```python
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+---
+
+## **📌 2. Criando o Upload de APKs no Servidor**
+Vamos criar um modelo para armazenar os APKs enviados via Django Admin ou upload manual.
+
+📁 **downloads/models.py**  
+```python
+from django.db import models
+
+class APKFile(models.Model):
+    nome = models.CharField(max_length=100)
+    arquivo = models.FileField(upload_to="apks/")
+
+    def __str__(self):
+        return self.nome
+```
+
+📁 **downloads/admin.py**  
+```python
+from django.contrib import admin
+from .models import APKFile
+
+admin.site.register(APKFile)
+```
+Agora podemos enviar APKs pelo Django Admin!
+
+---
+
+## **📌 3. Criando a API para o Usuário Baixar o APK**
+O usuário remoto precisa baixar o APK antes de instalá-lo no celular. Criamos uma API que retorna o link do arquivo.
+
+📁 **downloads/views.py**  
+```python
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from django.conf import settings
+from .models import APKFile
+
+def obter_link_apk(request, apk_id):
+    """
+    Retorna a URL do APK para download.
+    """
+    apk = get_object_or_404(APKFile, id=apk_id)
+    return JsonResponse({"url": f"{settings.MEDIA_URL}{apk.arquivo}"})
+```
+
+📁 **downloads/urls.py**  
+```python
+from django.urls import path
+from .views import obter_link_apk
+
+urlpatterns = [
+    path("apk/<int:apk_id>/", obter_link_apk, name="obter_link_apk"),
+]
+```
+Agora, um usuário remoto pode acessar:  
+```
+http://SEU_SERVIDOR/downloads/apk/1/
+```
+E receberá a URL para baixar o APK.
+
+---
+
+## **📌 4. Criando um Script para Instalar o APK no Usuário Remoto**
+Agora, o usuário remoto precisa **baixar o APK e instalar no celular** via **ADB**.  
+
+Criamos um **script Python** que ele pode rodar na máquina dele.  
+
+📁 **downloads/installer_script.py** (Usuário remoto precisa rodar esse script)  
+```python
+import requests
+import subprocess
+
+APK_ID = 1  # O ID do APK no banco de dados
+SERVER_URL = "http://SEU_SERVIDOR"
+
+def baixar_apk():
+    """
+    Baixa o APK do servidor e salva no computador do usuário.
+    """
+    response = requests.get(f"{SERVER_URL}/downloads/apk/{APK_ID}/")
+    if response.status_code == 200:
+        apk_url = SERVER_URL + response.json()["url"]
+        apk_path = "downloaded_apk.apk"
+
+        apk_file = requests.get(apk_url)
+        with open(apk_path, "wb") as f:
+            f.write(apk_file.content)
+        
+        print(f"APK baixado com sucesso: {apk_path}")
+        return apk_path
+    else:
+        print("Erro ao obter o link do APK")
+        return None
+
+def instalar_apk(apk_path):
+    """
+    Instala o APK usando ADB no celular conectado ao computador do usuário.
+    """
+    check_device = subprocess.run(["adb", "devices"], capture_output=True, text=True)
+    if "device" not in check_device.stdout.split("\n")[1]:
+        print("Nenhum dispositivo Android encontrado. Conecte o celular e tente novamente.")
+        return
+
+    result = subprocess.run(["adb", "install", apk_path], capture_output=True, text=True)
+    if result.returncode == 0:
+        print("APK instalado com sucesso!")
+    else:
+        print(f"Erro ao instalar APK: {result.stderr}")
+
+# Fluxo
+apk_path = baixar_apk()
+if apk_path:
+    instalar_apk(apk_path)
+```
+
+---
+
+## **📌 5. Como Funciona na Prática?**
+1️⃣ **Admin envia o APK** para o Django via painel administrativo.  
+2️⃣ **Usuário remoto acessa a API** e baixa o APK.  
+3️⃣ **Usuário remoto executa o script** e instala o APK no celular via ADB.  
+
+---
+
+## **📌 6. Melhorias Futuras**
+- **Gerar links de download temporários** (expiram após X minutos).  
+- **Interface Web para baixar o APK e executar o comando ADB automaticamente**.  
+
+Agora o usuário remoto pode **instalar APKs no celular conectado ao PC** de forma automática! 🚀

@@ -368,3 +368,52 @@ if apk_path:
 ✅ **Criamos um script remoto** que baixa e instala o APK via ADB.  
 
 Agora qualquer usuário remoto pode **acessar a API**, **baixar um APK** e **instalar no celular conectado ao PC**! 🚀
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import requests
+import subprocess
+import os
+
+def baixar_apk(url, caminho_arquivo="apk_temp.apk"):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(caminho_arquivo, 'wb') as f:
+            f.write(response.content)
+        print("APK baixado com sucesso!")
+        return caminho_arquivo
+    else:
+        print("Falha ao baixar o APK.")
+        return None
+
+def instalar_apk_adb(caminho_arquivo):
+    result = subprocess.run(['adb', 'install', caminho_arquivo], capture_output=True, text=True)
+    if result.returncode == 0:
+        print("APK instalado com sucesso!")
+    else:
+        print(f"Erro ao instalar APK: {result.stderr}")
+    os.remove(caminho_arquivo)  # Remove o arquivo após a instalação
+
+# Exemplo de URL da sua API Django REST
+apk_url = "http://127.0.0.1:8000/media/apks/seu_apk.apk"
+
+# Fluxo completo
+apk_baixado = baixar_apk(apk_url)
+if apk_baixado:
+    instalar_apk_adb(apk_baixado)

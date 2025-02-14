@@ -62,3 +62,51 @@ def download_apk(request):
     return redirect('home')
 
 # Se não funcionar diretamente no Django, implementarei o app auxiliar em Python com PyQt5 para consumir esta API, baixar o APK e executar o ADB localmente.
+
+
+
+
+
+
+
+
+
+
+// Implementação WebUSB para comunicação direta com dispositivos Android via navegador
+
+// templates/download.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Instalar APK via WebUSB</title>
+    <script>
+        async function installAPK() {
+            try {
+                const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x18D1 }] }); // Google Android
+                await device.open();
+                await device.selectConfiguration(1);
+                await device.claimInterface(0);
+
+                const apkResponse = await fetch('/path/to/apk');
+                const apkData = await apkResponse.arrayBuffer();
+
+                const command = new TextEncoder().encode('adb install /path/to/apk');
+
+                await device.transferOut(1, command);
+                console.log('Comando enviado para instalação.');
+            } catch (error) {
+                console.error('Erro durante a instalação:', error);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Instalação de APK via WebUSB</h1>
+    <button onclick="installAPK()">Instalar APK</button>
+</body>
+</html>
+
+# views.py e API Django permanecem como backend para servir os APKs.
+
+# Observação: A WebUSB requer HTTPS e permissões específicas no navegador.

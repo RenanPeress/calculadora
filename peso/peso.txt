@@ -1,0 +1,91 @@
+Aqui está uma solução simples e organizada para resolver o problema da distribuição das porcentagens de acordo com os tipos de task.
+
+Estratégia:
+1 - Definir os pesos para cada tipo de task em um dicionário.
+2 - Calcular a porcentagem correta baseada na quantidade de tasks de cada tipo.
+3 - Gerar um dicionário final associando cada device à sua respectiva porcentagem.
+4 - Enviar os valores corretamente para o sistema de apontamento via Selenium.
+
+
+Exemplo de Implementação:
+
+from collections import defaultdict
+
+# Pesos definidos para cada tipo de task
+TASK_WEIGHTS = {
+    "A": 10,
+    "B": 20,
+    "C": 30,
+    "D": 40
+}
+
+def calcular_porcentagem_tasks(tasks):
+    """
+    Calcula a porcentagem correta para cada device baseado nos tipos de tasks.
+    
+    :param tasks: Lista de dicionários representando tasks, ex.:
+        [
+            {"device": "X", "tipo": "A"},
+            {"device": "Y", "tipo": "B"},
+            {"device": "Z", "tipo": "C"},
+            {"device": "W", "tipo": "D"},
+        ]
+    :return: Dicionário com o device e a porcentagem correta.
+    """
+    # Agrupa as tasks por device e tipo
+    device_task_counts = defaultdict(lambda: defaultdict(int))
+    for task in tasks:
+        device_task_counts[task["device"]][task["tipo"]] += 1
+
+    # Calcula o total de peso
+    total_peso = sum(TASK_WEIGHTS[task["tipo"]] for task in tasks)
+
+    # Calcula a porcentagem final para cada device
+    device_percentages = {}
+    for device, tipos in device_task_counts.items():
+        total_peso_device = sum(TASK_WEIGHTS[tipo] * count for tipo, count in tipos.items())
+        device_percentages[device] = round((total_peso_device / total_peso) * 100, 2)
+
+    return device_percentages
+
+# Exemplo de entrada com tasks de diferentes tipos
+tasks = [
+    {"device": "X", "tipo": "A"},
+    {"device": "X", "tipo": "A"},
+    {"device": "Y", "tipo": "B"},
+    {"device": "Y", "tipo": "B"},
+    {"device": "Y", "tipo": "B"},
+    {"device": "Z", "tipo": "C"},
+    {"device": "Z", "tipo": "C"},
+    {"device": "Z", "tipo": "C"},
+    {"device": "Z", "tipo": "C"},
+    {"device": "W", "tipo": "D"},
+    {"device": "W", "tipo": "D"},
+    {"device": "W", "tipo": "D"},
+    {"device": "W", "tipo": "D"},
+    {"device": "W", "tipo": "D"},
+]
+
+# Testando a função
+print(calcular_porcentagem_tasks(tasks))
+
+
+
+
+Explicação:
+1 - Organizamos as tasks em um dicionário device_task_counts, que conta quantas tasks de cada tipo existem para cada device.
+2 - Calculamos o peso total somando os pesos de cada task com base no tipo.
+3 - Distribuímos a porcentagem corretamente para cada device proporcionalmente ao peso das suas tasks.
+4 - Formatamos o resultado final arredondando os valores para duas casas decimais.
+
+
+Exemplo de Saída:
+{
+    'X': 10.0,
+    'Y': 20.0,
+    'Z': 30.0,
+    'W': 40.0
+}
+
+
+Isso pode ser integrado diretamente na API Django REST Framework antes de enviar os dados ao sistema de apontamento via Selenium.
